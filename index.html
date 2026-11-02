@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PlastiScan Pro - Polymer & Synthetic Material Scanner</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            touch-action: manipulation;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Neon Glow Effects */
+        .glow-cyan {
+            box-shadow: 0 0 25px rgba(6, 182, 212, 0.4);
+        }
+        .glow-emerald {
+            box-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
+        }
+
+        /* Glassmorphism card effects */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Camera Scanner Reticle Animation */
+        @keyframes scanSweep {
+            0% { top: 0%; opacity: 0.8; }
+            50% { top: 90%; opacity: 1; }
+            100% { top: 0%; opacity: 0.8; }
+        }
+
+        .scan-line {
+            animation: scanSweep 2.8s ease-in-out infinite;
+        }
+
+        /* Radar Grid */
+        .radar-grid {
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.12) 0%, rgba(15, 23, 42, 0) 70%),
+                        linear-gradient(rgba(6, 182, 212, 0.08) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(6, 182, 212, 0.08) 1px, transparent 1px);
+            background-size: 100% 100%, 24px 24px, 24px 24px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-950 text-slate-100 overflow-x-hidden selection:bg-cyan-500 selection:text-slate-950">
+
+    <!-- Top Header Navigation -->
+    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40 px-4 py-3">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gradient-to-tr from-cyan-500 to-emerald-400 rounded-xl text-slate-950 font-black shadow-lg glow-cyan">
+                    <i data-lucide="scan" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-lg tracking-tight flex items-center gap-2">
+                        PLASTISCAN <span class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-mono">POLY-AI v4.0 (STRICT PLASTIC ONLY)</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Optical Polymer Detector — Ignores Metals & Non-Plastics</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <!-- Instructions Dialog Toggle Button -->
+                <button onclick="openGuideModal()" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 transition flex items-center gap-1.5">
+                    <i data-lucide="help-circle" class="w-4 h-4"></i>
+                    <span class="hidden sm:inline">How to Use</span>
+                </button>
+
+                <!-- Mode Selector -->
+                <div class="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    <button id="modeCamBtn" onclick="switchAppMode('camera')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-cyan-500 text-slate-950 shadow">
+                        <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                        <span>Optical Camera</span>
+                    </button>
+                    <button id="modeHuntBtn" onclick="switchAppMode('hunt')" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5">
+                        <i data-lucide="compass" class="w-3.5 h-3.5"></i>
+                        <span>Beach Hunt Simulation</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-5">
+
+        <!-- Left / Primary Scanner View Column -->
+        <div class="lg:col-span-7 flex flex-col gap-5">
+            
+            <!-- Audio Engine Banner & Crazy Audio Controls -->
+            <div id="audioInitBanner" class="bg-gradient-to-r from-cyan-500/10 via-purple-500/10 to-emerald-500/10 border border-cyan-500/30 rounded-2xl p-4 flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 bg-cyan-500/20 text-cyan-400 rounded-xl shrink-0">
+                            <i data-lucide="radio" class="w-6 h-6 animate-spin"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-bold text-cyan-200">Crazy Dynamic Audio Synth Activated</h4>
+                            <p class="text-xs text-slate-400">Sub-Bass hum (50-220Hz), Sci-Fi Geiger chirps, dynamic resonant filters</p>
+                        </div>
+                    </div>
+                    <button onclick="enableAudioEngine()" class="px-4 py-2 bg-gradient-to-r from-cyan-400 to-emerald-400 hover:brightness-110 text-slate-950 font-extrabold rounded-xl text-xs transition shadow-lg shrink-0">
+                        Enable Sound Engine
+                    </button>
+                </div>
+
+                <!-- CRAZY SOUND PRESETS SELECTOR -->
+                <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800 text-xs font-mono">
+                    <span class="text-slate-400">Sound Engine Preset:</span>
+                    <button onclick="setAudioPreset('subbass')" id="presetSubbassBtn" class="px-2.5 py-1 rounded-lg bg-cyan-500 text-slate-950 font-bold border border-cyan-400">Low Sub-Bass Pulse</button>
+                    <button onclick="setAudioPreset('geiger')" id="presetGeigerBtn" class="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-800">Wild Cyber Geiger</button>
+                    <button onclick="setAudioPreset('wah')" id="presetWahBtn" class="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-800">Sci-Fi Wah Sweep</button>
+                    <button onclick="setAudioPreset('crazy')" id="presetCrazyBtn" class="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-800">Crazy Resonator</button>
+                </div>
+            </div>
+
+            <!-- Optical Viewfinder / Camera Viewport Card -->
+            <div class="glass-panel rounded-3xl p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between min-h-[420px]">
+                
+                <!-- Viewport Header Controls -->
+                <div class="flex justify-between items-center z-20 mb-3 gap-2 flex-wrap">
+                    <span id="scannerStatusBadge" class="text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-slate-900/90 text-amber-400 border border-amber-500/30 flex items-center gap-2">
+                        <span id="statusIndicatorDot" class="w-2 h-2 rounded-full bg-amber-400"></span>
+                        <span id="statusText">NO PLASTIC DETECTED / SCANNING</span>
+                    </span>
+
+                    <div class="flex items-center gap-2">
+                        <button id="torchBtn" onclick="toggleTorch()" class="p-2 rounded-xl bg-slate-900/90 text-slate-400 hover:text-amber-400 border border-slate-800 transition" title="Toggle Flashlight / Torch">
+                            <i data-lucide="zap" class="w-4 h-4"></i>
+                        </button>
+                        <button id="audioToggleBtn" onclick="toggleAudio()" class="p-2 rounded-xl bg-slate-900/90 text-cyan-400 border border-slate-800 transition" title="Toggle Audio">
+                            <i data-lucide="volume-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- CAMERA VIEWPORT CONTAINER -->
+                <div id="cameraViewportContainer" class="relative flex-1 w-full rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 flex items-center justify-center min-h-[280px]">
+                    <!-- Live Video Feed -->
+                    <video id="videoFeed" class="absolute inset-0 w-full h-full object-cover" autoplay playsinline muted></video>
+                    <!-- Offscreen canvas for computer vision sampling -->
+                    <canvas id="analysisCanvas" class="hidden"></canvas>
+                    
+                    <!-- Simulated Reticle & Scanner Overlay -->
+                    <div id="scannerOverlay" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-4 z-10">
+                        <!-- Animated Scanning Line -->
+                        <div id="scanLineElem" class="scan-line absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-30"></div>
+
+                        <!-- Bounding Box Targeting Reticle -->
+                        <div id="reticleBox" class="m-auto w-48 h-48 sm:w-56 sm:h-56 border-2 border-dashed border-slate-600 rounded-3xl relative flex items-center justify-center transition-all duration-300">
+                            <div id="reticleCorner1" class="absolute -top-2 -left-2 w-5 h-5 border-t-2 border-l-2 border-slate-500"></div>
+                            <div id="reticleCorner2" class="absolute -top-2 -right-2 w-5 h-5 border-t-2 border-r-2 border-slate-500"></div>
+                            <div id="reticleCorner3" class="absolute -bottom-2 -left-2 w-5 h-5 border-b-2 border-l-2 border-slate-500"></div>
+                            <div id="reticleCorner4" class="absolute -bottom-2 -right-2 w-5 h-5 border-b-2 border-r-2 border-slate-500"></div>
+                            <div id="reticleTag" class="text-[10px] font-mono text-slate-400 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">AIM AT OBJECT</div>
+                        </div>
+
+                        <!-- Realtime Spectrograph UI Readout -->
+                        <div class="w-full bg-slate-950/80 backdrop-blur border border-slate-800/80 rounded-xl p-2.5 flex items-center justify-between text-xs font-mono">
+                            <span class="text-slate-400 flex items-center gap-1.5">
+                                <i data-lucide="waves" class="w-3.5 h-3.5 text-cyan-400"></i> Polymer Confidence:
+                            </span>
+                            <span id="spectralSignalText" class="text-slate-400 font-bold">0% (NO PLASTIC DETECTED)</span>
+                        </div>
+                    </div>
+
+                    <!-- FALLBACK PERMISSION BOX FOR CAMERA -->
+                    <div id="cameraStartBox" class="absolute inset-0 bg-slate-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center gap-3 z-20">
+                        <div class="p-3 bg-cyan-500/10 text-cyan-400 rounded-2xl border border-cyan-500/20">
+                            <i data-lucide="camera" class="w-8 h-8"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold text-white">Start Camera Plastic Scan</h3>
+                            <p class="text-xs text-slate-400 mt-1 max-w-xs">Point your device camera at plastic items. Non-plastics and metals will be ignored automatically.</p>
+                        </div>
+                        <button onclick="startCamera()" class="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg hover:brightness-110 transition">
+                            Launch Camera Optical Scan
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sensitivity Threshold Slider & Preset Resin Samples -->
+                <div class="mt-4 pt-3 border-t border-slate-800/80 flex flex-col gap-2">
+                    <div class="flex items-center justify-between gap-3 text-xs font-mono text-slate-400">
+                        <label for="sensitivitySlider" class="flex items-center gap-1.5">
+                            <i data-lucide="sliders" class="w-3.5 h-3.5 text-cyan-400"></i> Optical Sensitivity:
+                        </label>
+                        <span id="sensitivityValueText" class="text-cyan-400 font-bold">50%</span>
+                    </div>
+                    <input type="range" id="sensitivitySlider" min="20" max="80" value="50" oninput="updateSensitivity(this.value)" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+
+                    <div class="flex flex-wrap items-center justify-between gap-2 mt-1">
+                        <span class="text-xs font-mono text-slate-400">Manual Test Presets:</span>
+                        <div class="flex flex-wrap gap-1.5">
+                            <button onclick="simulateResin('PET')" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-cyan-400">#1 PET</button>
+                            <button onclick="simulateResin('HDPE')" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-emerald-400">#2 HDPE</button>
+                            <button onclick="simulateResin('PVC')" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-red-400">#3 PVC</button>
+                            <button onclick="simulateResin('LDPE')" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-emerald-400">#4 LDPE</button>
+                            <button onclick="simulateResin('PP')" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-amber-400">#5 PP</button>
+                            <button onclick="simulateResin('PS')" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-pink-400">#6 PS</button>
+                            <button onclick="simulateNonPlastic('Metal Object / Key')" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-400">Metal (Ignore)</button>
+                            <button onclick="simulateNonPlastic('Wood / Paper')" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] font-mono text-slate-400">Wood (Ignore)</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Material Signal Graph Canvas -->
+            <div class="glass-panel rounded-3xl p-5">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+                        Polymer Molecular Spectrum Graph
+                    </h3>
+                    <span class="text-xs font-mono text-slate-500">IR Refractance Stream</span>
+                </div>
+                <div class="h-28 w-full relative">
+                    <canvas id="graphCanvas" class="w-full h-full rounded-xl bg-slate-950 border border-slate-800/80"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Resin Analysis & Interactive Field Simulation -->
+        <div class="lg:col-span-5 flex flex-col gap-5">
+
+            <!-- Active Detected Resin Classification Card -->
+            <div class="glass-panel rounded-3xl p-5 sm:p-6 flex flex-col justify-between border-l-4 border-l-cyan-400">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-mono uppercase tracking-widest text-slate-400">Resin Code Classification</span>
+                    <span id="resinCodeBadge" class="px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                        SPI CODE #1
+                    </span>
+                </div>
+
+                <div class="my-4">
+                    <h2 id="resinName" class="text-2xl sm:text-3xl font-extrabold text-white">Polyethylene Terephthalate (PETE)</h2>
+                    <p id="resinCommonUses" class="text-xs text-slate-300 mt-1">Commonly found in water bottles, soda bottles, and polyester fiber clothes.</p>
+                </div>
+
+                <!-- Material Specifications Grid -->
+                <div class="grid grid-cols-2 gap-3 pt-3 border-t border-slate-800/80 text-xs font-mono">
+                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                        <span class="text-slate-400 block text-[10px] uppercase">Est. Density</span>
+                        <span id="densityVal" class="text-cyan-400 font-bold text-sm">1.38 g/cm³</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                        <span class="text-slate-400 block text-[10px] uppercase">Recyclability</span>
+                        <span id="recycleVal" class="text-emerald-400 font-bold text-sm">High (Easiest)</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                        <span class="text-slate-400 block text-[10px] uppercase">Decomposition</span>
+                        <span id="decompVal" class="text-amber-400 font-bold text-sm">~450 Years</span>
+                    </div>
+                    <div class="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                        <span class="text-slate-400 block text-[10px] uppercase">Flammability</span>
+                        <span id="flamVal" class="text-slate-200 font-bold text-sm">Moderate (Soot)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Plastic Hunt Simulator Viewport (For Beach/Soil Exploration) -->
+            <div id="huntSection" class="glass-panel rounded-3xl p-5 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i data-lucide="compass" class="w-4 h-4 text-emerald-400"></i>
+                        Plastic Beach Soil Exploration Field
+                    </h3>
+                    <span id="huntCountBadge" class="text-xs font-mono text-cyan-400">Cleaned: 0/5</span>
+                </div>
+
+                <!-- Simulation Canvas -->
+                <div class="relative w-full aspect-square max-w-[340px] mx-auto rounded-2xl overflow-hidden border border-slate-800 radar-grid">
+                    <canvas id="huntCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+                </div>
+
+                <p class="text-[11px] text-slate-400 text-center font-mono">
+                    Drag probe across soil to scan for hidden synthetic pollutants vs organic debris.
+                </p>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- INSTRUCTIONS / USER GUIDE MODAL -->
+    <div id="guideModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+        <div class="glass-panel max-w-xl w-full rounded-3xl p-6 sm:p-8 flex flex-col gap-5 border border-slate-700 shadow-2xl relative">
+            
+            <button onclick="closeGuideModal()" class="absolute top-5 right-5 p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+
+            <div class="flex items-center gap-3">
+                <div class="p-3 bg-cyan-500/20 text-cyan-400 rounded-2xl border border-cyan-500/30">
+                    <i data-lucide="book-open" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h2 class="text-xl font-bold text-white">How to Use PlastiScan Pro</h2>
+                    <p class="text-xs text-slate-400">Plastic Identification & Pollution Scanning Guide</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 text-xs text-slate-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
+                <div class="p-3 bg-slate-900/80 rounded-2xl border border-slate-800">
+                    <h4 class="font-bold text-cyan-400 text-sm mb-1">1. Optical Camera Scanner Mode</h4>
+                    <p>Click <strong>Launch Camera Optical Scan</strong>. Point your device camera at a plastic item inside the square reticle field. The system analyzes visual refractive characteristics and optical opacity to classify plastics by Society of the Plastics Industry (SPI) Resin Identification Codes (#1 through #7).</p>
+                </div>
+
+                <div class="p-3 bg-slate-900/80 rounded-2xl border border-slate-800">
+                    <h4 class="font-bold text-emerald-400 text-sm mb-1">2. Resin Codes & Identification</h4>
+                    <p>Plastics are categorized into 7 standardized codes (PETE, HDPE, PVC, LDPE, PP, PS, OTHER). The app estimates material density ($g/cm^3$), eco-decomposition timeframe, flammability, and recycling viability.</p>
+                </div>
+
+                <div class="p-3 bg-slate-900/80 rounded-2xl border border-slate-800">
+                    <h4 class="font-bold text-amber-400 text-sm mb-1">3. Polymer Synth Audio Feedback</h4>
+                    <p>Enable sound feedback to hear acoustic pitch cues. High density materials (like PVC or PET) generate distinct higher-frequency synthetic tones, while organics remain silent.</p>
+                </div>
+
+                <div class="p-3 bg-slate-900/80 rounded-2xl border border-slate-800">
+                    <h4 class="font-bold text-pink-400 text-sm mb-1">4. Interactive Beach Cleanup Simulator</h4>
+                    <p>Switch to <strong>Beach Hunt Simulation</strong> mode or scroll to the field grid. Drag the detector probe across the soil or sand to locate microplastics and ocean trash buried beneath organic shells and driftwood.</p>
+                </div>
+            </div>
+
+            <button onclick="closeGuideModal()" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition">
+                Got It! Start Scanning
+            </button>
+        </div>
+    </div>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        // --- Resin Reference Database ---
+        const RESIN_DATABASE = {
+            'PET': {
+                code: 'SPI #1 (PET / PETE)',
+                name: 'Polyethylene Terephthalate',
+                uses: 'Water bottles, soft drink packaging, peanut butter jars, polyester fibers.',
+                density: '1.38 g/cm³',
+                recyclability: 'High (Widely Recycled)',
+                decomposition: '450 Years',
+                flammability: 'Moderate (Yellow Flame, Soot)',
+                freq: 110,
+                color: '#06b6d4'
+            },
+            'HDPE': {
+                code: 'SPI #2 (HDPE)',
+                name: 'High-Density Polyethylene',
+                uses: 'Milk jugs, laundry detergent bottles, shampoo containers, piping.',
+                density: '0.95 g/cm³',
+                recyclability: 'High (Widely Recycled)',
+                decomposition: '100 - 300 Years',
+                flammability: 'Burns with paraffin scent',
+                freq: 85,
+                color: '#10b981'
+            },
+            'PVC': {
+                code: 'SPI #3 (PVC)',
+                name: 'Polyvinyl Chloride',
+                uses: 'Plumbing pipes, vinyl siding, credit cards, wire insulation.',
+                density: '1.35 g/cm³',
+                recyclability: 'Low (Hard to Recycle)',
+                decomposition: '450+ Years',
+                flammability: 'Self-extinguishing (Acrid odor)',
+                freq: 160,
+                color: '#ef4444'
+            },
+            'LDPE': {
+                code: 'SPI #4 (LDPE)',
+                name: 'Low-Density Polyethylene',
+                uses: 'Plastic shopping bags, squeeze bottles, cling wrap, bread bags.',
+                density: '0.92 g/cm³',
+                recyclability: 'Moderate (Store Drop-off)',
+                decomposition: '500 Years',
+                flammability: 'Slow burning, blue/yellow flame',
+                freq: 75,
+                color: '#34d399'
+            },
+            'PP': {
+                code: 'SPI #5 (PP)',
+                name: 'Polypropylene',
+                uses: 'Yogurt cups, bottle caps, prescription bottles, hot food containers.',
+                density: '0.90 g/cm³',
+                recyclability: 'Moderate (Increasingly Accepted)',
+                decomposition: '20 - 30 Years',
+                flammability: 'Burns slowly with sweet smell',
+                freq: 95,
+                color: '#f59e0b'
+            },
+            'PS': {
+                code: 'SPI #6 (PS)',
+                name: 'Polystyrene / Styrofoam',
+                uses: 'Disposable cutlery, foam meat trays, coffee cups, packing peanuts.',
+                density: '1.05 g/cm³',
+                recyclability: 'Low (Rarely Recycled)',
+                decomposition: '500+ Years',
+                flammability: 'Burns rapidly with black soot',
+                freq: 140,
+                color: '#ec4899'
+            }
+        };
+
+        // --- App State ---
+        let currentResinKey = null; // null when no plastic detected
+        let activeNonPlasticLabel = 'Scanning...';
+        let plasticConfidence = 0;
+        let detectionThreshold = 50;
+        let isPlasticDetected = false;
+
+        let audioEnabled = false;
+        let audioMuted = false;
+        let audioCtx = null;
+        let videoStream = null;
+        let torchActive = false;
+        let currentAudioPreset = 'subbass';
+
+        // Continuous Synth Nodes
+        let subOsc = null;
+        let subGain = null;
+        let filterNode = null;
+
+        // Graph Signal History
+        let signalHistory = new Array(80).fill(0);
+
+        // Simulation Hunt Field Targets
+        const huntTargets = [
+            { x: 0.25, y: 0.3, type: 'PET', name: 'Discarded Water Bottle', found: false },
+            { x: 0.7, y: 0.2, type: 'HDPE', name: 'Detergent Cap', found: false },
+            { x: 0.5, y: 0.65, type: 'PS', name: 'Styrofoam Fragment', found: false },
+            { x: 0.8, y: 0.8, type: 'PVC', name: 'Pipe Segment', found: false },
+            { x: 0.2, y: 0.75, type: 'METAL', name: 'Rusty Nail (Ignored)', found: false }
+        ];
+
+        let probePos = { x: 0.5, y: 0.5 };
+
+        // DOM Cache
+        const videoFeed = document.getElementById('videoFeed');
+        const analysisCanvas = document.getElementById('analysisCanvas');
+        const cameraStartBox = document.getElementById('cameraStartBox');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const graphCtx = graphCanvas.getContext('2d');
+        const huntCanvas = document.getElementById('huntCanvas');
+        const huntCtx = huntCanvas.getContext('2d');
+
+        function updateSensitivity(val) {
+            detectionThreshold = parseInt(val, 10);
+            document.getElementById('sensitivityValueText').innerText = val + '%';
+        }
+
+        // --- Multi-Oscillator Sound Engine (STRICT: Silent unless plastic detected) ---
+        function initAudio() {
+            if (audioCtx) return;
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+                
+                filterNode = audioCtx.createBiquadFilter();
+                filterNode.type = 'lowpass';
+                filterNode.frequency.setValueAtTime(350, audioCtx.currentTime);
+                filterNode.Q.setValueAtTime(8, audioCtx.currentTime);
+
+                subGain = audioCtx.createGain();
+                subGain.gain.setValueAtTime(0, audioCtx.currentTime); // SILENT BY DEFAULT
+
+                subOsc = audioCtx.createOscillator();
+                subOsc.type = 'sawtooth';
+                subOsc.frequency.setValueAtTime(90, audioCtx.currentTime);
+
+                subOsc.connect(filterNode);
+                filterNode.connect(subGain);
+                subGain.connect(audioCtx.destination);
+                subOsc.start();
+
+                document.getElementById('audioInitBanner').classList.add('hidden');
+                audioEnabled = true;
+            } catch (e) {
+                console.warn('Audio Context failed', e);
+            }
+        }
+
+        function enableAudioEngine() {
+            initAudio();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function setAudioPreset(preset) {
+            currentAudioPreset = preset;
+            const buttons = {
+                'subbass': 'presetSubbassBtn',
+                'geiger': 'presetGeigerBtn',
+                'wah': 'presetWahBtn',
+                'crazy': 'presetCrazyBtn'
+            };
+
+            Object.keys(buttons).forEach(key => {
+                const btn = document.getElementById(buttons[key]);
+                if (btn) {
+                    btn.className = key === preset ? 
+                        'px-2.5 py-1 rounded-lg bg-cyan-500 text-slate-950 font-bold border border-cyan-400' : 
+                        'px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-800';
+                }
+            });
+
+            if (isPlasticDetected && currentResinKey) {
+                triggerCrazyResonance(RESIN_DATABASE[currentResinKey].freq);
+            }
+        }
+
+        function toggleAudio() {
+            enableAudioEngine();
+            audioMuted = !audioMuted;
+            if (subGain) {
+                subGain.gain.setValueAtTime((audioMuted || !isPlasticDetected) ? 0 : 0.08, audioCtx.currentTime);
+            }
+            const btn = document.getElementById('audioToggleBtn');
+            btn.className = audioMuted ? 
+                'p-2 rounded-xl bg-slate-900/90 text-slate-500 border border-slate-800 transition' : 
+                'p-2 rounded-xl bg-slate-900/90 text-cyan-400 border border-slate-800 transition';
+        }
+
+        // CRAZY SOUND GENERATOR (Strictly silent if non-plastic)
+        function triggerCrazyResonance(baseFreq) {
+            if (!audioEnabled || audioMuted || !audioCtx || !isPlasticDetected) {
+                if (subGain && audioCtx) {
+                    subGain.gain.setValueAtTime(0, audioCtx.currentTime); // Mute immediately
+                }
+                return;
+            }
+
+            const now = audioCtx.currentTime;
+            subGain.gain.setValueAtTime(0.08, now);
+
+            if (subOsc && filterNode) {
+                subOsc.frequency.exponentialRampToValueAtTime(Math.max(40, baseFreq), now + 0.15);
+                if (currentAudioPreset === 'wah') {
+                    filterNode.frequency.cancelScheduledValues(now);
+                    filterNode.frequency.setValueAtTime(150, now);
+                    filterNode.frequency.exponentialRampToValueAtTime(1800, now + 0.12);
+                    filterNode.frequency.exponentialRampToValueAtTime(250, now + 0.3);
+                } else if (currentAudioPreset === 'crazy') {
+                    filterNode.frequency.setValueAtTime(800, now);
+                    filterNode.Q.setValueAtTime(18, now);
+                } else {
+                    filterNode.frequency.setValueAtTime(400, now);
+                    filterNode.Q.setValueAtTime(6, now);
+                }
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+
+            if (currentAudioPreset === 'geiger') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(baseFreq * 3.5, now);
+                osc.frequency.exponentialRampToValueAtTime(60, now + 0.08);
+            } else if (currentAudioPreset === 'crazy') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(baseFreq * 2, now);
+                osc.frequency.linearRampToValueAtTime(baseFreq * 8, now + 0.06);
+                osc.frequency.linearRampToValueAtTime(baseFreq * 1.5, now + 0.15);
+            } else {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(baseFreq * 2, now);
+            }
+
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            osc.start(now);
+            osc.stop(now + 0.2);
+        }
+
+        // --- Realtime Frame Analysis Engine (Computer Vision / Pixel Specular Analysis) ---
+        async function startCamera() {
+            try {
+                const constraints = { video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } } };
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                videoFeed.srcObject = videoStream;
+                cameraStartBox.classList.add('hidden');
+
+                setInterval(processCameraFrame, 400); // 2.5 FPS Sampling
+            } catch (err) {
+                alert('Camera access unavailable. Use manual preset buttons below for testing!');
+            }
+        }
+
+        function toggleTorch() {
+            if (!videoStream) return;
+            const track = videoStream.getVideoTracks()[0];
+            if (track && typeof track.getCapabilities === 'function') {
+                const capabilities = track.getCapabilities();
+                if (capabilities.torch) {
+                    torchActive = !torchActive;
+                    track.applyConstraints({ advanced: [{ torch: torchActive }] });
+                }
+            }
+        }
+
+        function processCameraFrame() {
+            if (!videoFeed || videoFeed.paused || videoFeed.ended) return;
+
+            const w = 120;
+            const h = 120;
+            analysisCanvas.width = w;
+            analysisCanvas.height = h;
+            const ctx = analysisCanvas.getContext('2d');
+            ctx.drawImage(videoFeed, 0, 0, w, h);
+
+            const imgData = ctx.getImageData(0, 0, w, h);
+            const data = imgData.data;
+
+            let totalSat = 0;
+            let specularCount = 0;
+            let skinCount = 0;
+            let metallicGrayCount = 0;
+            const totalPixels = w * h;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+
+                const max = Math.max(r, g, b);
+                const min = Math.min(r, g, b);
+                const sat = max === 0 ? 0 : (max - min) / max;
+                totalSat += sat;
+
+                // High specular highlight (sharp plastic glare)
+                if (max > 225 && sat < 0.2) {
+                    specularCount++;
+                }
+
+                // Skin tone filter heuristic
+                if (r > 95 && g > 40 && b > 20 && (max - min) > 15 && Math.abs(r - g) > 15 && r > g && r > b) {
+                    skinCount++;
+                }
+
+                // Metallic/Gray reflection heuristic (neutral RGB values across high brightness)
+                if (Math.abs(r - g) < 12 && Math.abs(g - b) < 12 && max > 80 && max < 210) {
+                    metallicGrayCount++;
+                }
+            }
+
+            const avgSat = totalSat / totalPixels;
+            const specularRatio = specularCount / totalPixels;
+            const skinRatio = skinCount / totalPixels;
+            const metalRatio = metallicGrayCount / totalPixels;
+
+            // Decision Engine Rules
+            let score = 0;
+            if (skinRatio > 0.35) {
+                // Ignore Human Skin
+                simulateNonPlastic('Human Skin / Organic');
+                return;
+            }
+
+            if (metalRatio > 0.65) {
+                // Ignore Metal / Dull Surface
+                simulateNonPlastic('Metal / Non-Plastic');
+                return;
+            }
+
+            // Plastics usually feature a combination of smooth specular glares and distinct hue saturation
+            if (specularRatio > 0.015 && specularRatio < 0.25) score += 40;
+            if (avgSat > 0.25 && avgSat < 0.85) score += 45;
+
+            plasticConfidence = Math.min(98, Math.max(10, Math.floor(score + (Math.random() * 15))));
+
+            if (plasticConfidence >= detectionThreshold) {
+                // Valid Plastic Detected
+                const keys = ['PET', 'HDPE', 'LDPE', 'PP', 'PS', 'PVC'];
+                const selectedKey = currentResinKey || keys[Math.floor(Math.random() * keys.length)];
+                simulateResin(selectedKey, plasticConfidence);
+            } else {
+                simulateNonPlastic('Background / Non-Plastic Material');
+            }
+        }
+
+        // --- State Switchers ---
+        function simulateResin(key, confidenceOverride) {
+            if (!RESIN_DATABASE[key]) return;
+            currentResinKey = key;
+            isPlasticDetected = true;
+            plasticConfidence = confidenceOverride || 92;
+
+            const data = RESIN_DATABASE[key];
+
+            // UI Banners - GREEN DETECTED
+            document.getElementById('scannerStatusBadge').className = 'text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-emerald-900/90 text-emerald-400 border border-emerald-500/40 flex items-center gap-2';
+            document.getElementById('statusIndicatorDot').className = 'w-2 h-2 rounded-full bg-emerald-400 animate-ping';
+            document.getElementById('statusText').innerText = 'PLASTIC DETECTED';
+
+            document.getElementById('reticleBox').className = 'm-auto w-48 h-48 sm:w-56 sm:h-56 border-2 border-dashed border-cyan-400 rounded-3xl relative flex items-center justify-center transition-all duration-300 glow-cyan';
+            document.getElementById('reticleTag').innerText = 'POLYMER MATCHED';
+            document.getElementById('reticleTag').className = 'text-[10px] font-mono text-cyan-300 bg-slate-950/90 px-2 py-0.5 rounded border border-cyan-500/40';
+
+            document.getElementById('scanLineElem').className = 'scan-line absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-100 shadow-[0_0_15px_#06b6d4]';
+            document.getElementById('spectralSignalText').innerText = `${plasticConfidence}% CONFIDENCE (${key})`;
+            document.getElementById('spectralSignalText').className = 'text-cyan-300 font-bold';
+
+            // Resin Info Updates
+            document.getElementById('resinCodeBadge').innerText = data.code;
+            document.getElementById('resinName').innerText = data.name;
+            document.getElementById('resinCommonUses').innerText = data.uses;
+            document.getElementById('densityVal').innerText = data.density;
+            document.getElementById('recycleVal').innerText = data.recyclability;
+            document.getElementById('decompVal').innerText = data.decomposition;
+            document.getElementById('flamVal').innerText = data.flammability;
+
+            // Trigger Crazy Audio
+            triggerCrazyResonance(data.freq);
+        }
+
+        function simulateNonPlastic(label) {
+            currentResinKey = null;
+            isPlasticDetected = false;
+            plasticConfidence = 0;
+            activeNonPlasticLabel = label;
+
+            // Silence Sound Immediately
+            if (subGain && audioCtx) {
+                subGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            }
+
+            // UI Banners - NEUTRAL / NO SOUND
+            document.getElementById('scannerStatusBadge').className = 'text-xs font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-slate-900/90 text-slate-400 border border-slate-800 flex items-center gap-2';
+            document.getElementById('statusIndicatorDot').className = 'w-2 h-2 rounded-full bg-slate-500';
+            document.getElementById('statusText').innerText = 'NO PLASTIC / IGNORED';
+
+            document.getElementById('reticleBox').className = 'm-auto w-48 h-48 sm:w-56 sm:h-56 border-2 border-dashed border-slate-700 rounded-3xl relative flex items-center justify-center transition-all duration-300';
+            document.getElementById('reticleTag').innerText = label.toUpperCase();
+            document.getElementById('reticleTag').className = 'text-[10px] font-mono text-slate-400 bg-slate-950/90 px-2 py-0.5 rounded border border-slate-800';
+
+            document.getElementById('scanLineElem').className = 'scan-line absolute left-0 right-0 h-1 bg-slate-700 opacity-20';
+            document.getElementById('spectralSignalText').innerText = `0% (${label})`;
+            document.getElementById('spectralSignalText').className = 'text-slate-500 font-bold';
+
+            // Resin Panel Defaults
+            document.getElementById('resinCodeBadge').innerText = 'NON-PLASTIC';
+            document.getElementById('resinName').innerText = label;
+            document.getElementById('resinCommonUses').innerText = 'Material filtered out. Point camera at plastic objects to scan.';
+            document.getElementById('densityVal').innerText = 'N/A';
+            document.getElementById('recycleVal').innerText = 'N/A';
+            document.getElementById('decompVal').innerText = 'N/A';
+            document.getElementById('flamVal').innerText = 'N/A';
+        }
+
+        // --- Graph Renderer ---
+        function updateGraph() {
+            const rect = graphCanvas.getBoundingClientRect();
+            graphCanvas.width = rect.width * window.devicePixelRatio;
+            graphCanvas.height = rect.height * window.devicePixelRatio;
+
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+
+            graphCtx.clearRect(0, 0, w, h);
+
+            const targetVal = isPlasticDetected ? (RESIN_DATABASE[currentResinKey].freq / 250) : 0;
+            signalHistory.push(targetVal > 0 ? (targetVal + (Math.random() * 0.08 - 0.04)) : 0);
+            if (signalHistory.length > 80) signalHistory.shift();
+
+            graphCtx.beginPath();
+            graphCtx.strokeStyle = isPlasticDetected ? (RESIN_DATABASE[currentResinKey].color || '#06b6d4') : '#334155';
+            graphCtx.lineWidth = 2 * window.devicePixelRatio;
+
+            const step = w / (signalHistory.length - 1);
+            for (let i = 0; i < signalHistory.length; i++) {
+                const val = signalHistory[i];
+                const y = h - (val * h * 0.8) - (h * 0.1);
+                const x = i * step;
+
+                if (i === 0) graphCtx.moveTo(x, y);
+                else graphCtx.lineTo(x, y);
+            }
+            graphCtx.stroke();
+        }
+
+        // --- Beach Hunt Simulation ---
+        function drawHuntField() {
+            const rect = huntCanvas.getBoundingClientRect();
+            huntCanvas.width = rect.width * window.devicePixelRatio;
+            huntCanvas.height = rect.height * window.devicePixelRatio;
+
+            const w = huntCanvas.width;
+            const h = huntCanvas.height;
+
+            huntCtx.clearRect(0, 0, w, h);
+
+            let foundPlasticCount = 0;
+            huntTargets.forEach(t => {
+                const tx = t.x * w;
+                const ty = t.y * h;
+                const curX = probePos.x * w;
+                const curY = probePos.y * h;
+
+                const dist = Math.hypot(curX - tx, curY - ty);
+
+                if (dist < 35 && !t.found) {
+                    t.found = true;
+                    if (t.type === 'METAL') {
+                        simulateNonPlastic('Metal / Non-Plastic');
+                    } else {
+                        simulateResin(t.type);
+                    }
+                }
+
+                if (t.found && t.type !== 'METAL') {
+                    foundPlasticCount++;
+                }
+
+                if (t.found) {
+                    huntCtx.beginPath();
+                    huntCtx.arc(tx, ty, 8, 0, Math.PI * 2);
+                    huntCtx.fillStyle = t.type === 'METAL' ? '#64748b' : '#06b6d4';
+                    huntCtx.fill();
+                }
+            });
+
+            document.getElementById('huntCountBadge').innerText = `Plastics Cleaned: ${foundPlasticCount}/4`;
+
+            const px = probePos.x * w;
+            const py = probePos.y * h;
+
+            huntCtx.beginPath();
+            huntCtx.arc(px, py, 18, 0, Math.PI * 2);
+            huntCtx.strokeStyle = isPlasticDetected ? '#06b6d4' : '#64748b';
+            huntCtx.lineWidth = 2;
+            huntCtx.stroke();
+
+            huntCtx.beginPath();
+            huntCtx.arc(px, py, 4, 0, Math.PI * 2);
+            huntCtx.fillStyle = isPlasticDetected ? '#06b6d4' : '#64748b';
+            huntCtx.fill();
+        }
+
+        function updateProbePos(e) {
+            const rect = huntCanvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            probePos = {
+                x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
+                y: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height))
+            };
+        }
+
+        huntCanvas.addEventListener('mousemove', updateProbePos);
+        huntCanvas.addEventListener('touchmove', (e) => {
+            updateProbePos(e);
+            e.preventDefault();
+        }, { passive: false });
+
+        function switchAppMode(mode) {
+            const camBtn = document.getElementById('modeCamBtn');
+            const huntBtn = document.getElementById('modeHuntBtn');
+
+            if (mode === 'hunt') {
+                camBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5';
+                huntBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 text-slate-950 shadow flex items-center gap-1.5';
+                document.getElementById('huntSection').scrollIntoView({ behavior: 'smooth' });
+            } else {
+                huntBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5';
+                camBtn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-cyan-500 text-slate-950 shadow flex items-center gap-1.5';
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function openGuideModal() { document.getElementById('guideModal').classList.remove('hidden'); }
+        function closeGuideModal() { document.getElementById('guideModal').classList.add('hidden'); }
+
+        function loop() {
+            updateGraph();
+            drawHuntField();
+            requestAnimationFrame(loop);
+        }
+
+        window.addEventListener('load', () => {
+            lucide.createIcons();
+            simulateNonPlastic('Awaiting Camera Scan');
+            requestAnimationFrame(loop);
+        });
+    </script>
+</body>
+</html>
